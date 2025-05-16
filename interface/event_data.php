@@ -257,7 +257,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         // Retrieve and sanitize form data for wp_event_accueil
-        $accueil_necessaire = $_POST['accueil']; // "oui" or "non"
+        $accueil_necessaire = isset($_POST['accueil']) ? $_POST['accueil'] : 'non';
         $accueil_type = isset($_POST['accueil_type']) ? $_POST['accueil_type'] : null; // Selected type
         $accueil_autre = $_POST['accueil_autre'] ?? null; // Optional "autre" field
         $accueil_materiel = isset($_POST['accueil_materiel']) ? $_POST['accueil_materiel'] : null; // Selected material
@@ -286,8 +286,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         // Retrieve and sanitize form data for wp_event_restauration
-        $restauration_necessaire = in_array($_POST['restauration'], ['oui', 'non']) ? $_POST['restauration'] : null;
-        $restauration_type = isset($_POST['restauration_type']) ? implode(", ", $_POST['restauration_type']) : null;
+$restauration_necessaire = isset($_POST['restauration']) && in_array($_POST['restauration'], ['oui', 'non']) ? $_POST['restauration'] : null;        $restauration_type = isset($_POST['restauration_type']) ? implode(", ", $_POST['restauration_type']) : null;
         $restauration_autre = $_POST['restauration_autre'] ?? null;
         $restauration_duree = $_POST['restauration_duree'] ?? null;
         $restauration_format = isset($_POST['restauration_format']) ? implode(", ", $_POST['restauration_format']) : null;
@@ -427,7 +426,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         // Commit the transaction
         $conn->commit();
-        echo "New records created successfully. Event ID: " . $event_id;
+        echo '
+        <div style="
+            background: #e6f7ee;
+            border: 1px solid #2ecc71;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 400px;
+            margin: 20px auto;
+            text-align: center;
+        ">
+            <img src="https://cdn-icons-png.flaticon.com/512/845/845646.png" width="80" alt="Check Icon">
+            <h3 style="color: #2ecc71; margin: 10px 0 5px 0;">Succès!</h3>
+            <p style="color: #333; font-size: 16px;"><b>Merci! Votre formulaire a été soumis avec succès.<b></p>
+        </div>
+    ';
     } catch (Exception $e) {
         // Rollback the transaction on error
         $conn->rollback();

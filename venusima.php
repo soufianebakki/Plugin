@@ -6,82 +6,30 @@
  * Author:      Soufiane Bakki
  * Text Domain: Multi_task_plugin
  */
-defined('ABSPATH') or die('Direct access not allowed');
-
-// Include necessary files
-require_once plugin_dir_path(__FILE__) . 'includes/event-functions.php';
-require_once plugin_dir_path(__FILE__) . 'includes/class-database.php';
-
-
-// Register activation hook
-register_activation_hook(__FILE__, 'bako_plugin_activation');
-
-function bako_plugin_activation() {
-    // Initialize database tables
-    Bako_DB::create_tables();
-    
-    // Flush rewrite rules
-    flush_rewrite_rules();
-}
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
 }
 
-// Add this to your main plugin file
-function register_event_details_endpoint() {
-    add_rewrite_rule(
-        '^event-details/([0-9]+)/?',
-        'indexx.php?event_id=$matches[1]',
-        'top'
-    );
-    
-    add_rewrite_tag('%event_id%', '([0-9]+)');
-}
-add_action('init', 'register_event_details_endpoint');
 
-function handle_event_details_endpoint() {
-    global $wp_query;
-    
-    $event_id = isset($wp_query->query_vars['event_id']) ? intval($wp_query->query_vars['event_id']) : 0;
-    
-    if ($event_id) {
-        // Include your display code directly
-        include plugin_dir_path(__FILE__) . 'templates/event-display.php';
-        exit;
-    }
-}
-add_action('template_redirect', 'handle_event_details_endpoint');
 
 // Add this to your plugin's activation hook (where you have create_multistep_form_page())
-// Create/verify the Event Details page on plugin activation
 function create_event_details_page() {
-    // Check if page with this template already exists
-    $existing_page = get_pages([
-        'meta_key' => '_wp_page_template',
-        'meta_value' => 'event-details-template.php',
-        'number' => 1
-    ]);
-    
-    if (empty($existing_page)) {
+    if (!get_page_by_path('event-details')) {
         $page_id = wp_insert_post([
-            'post_title' => 'Event Details',
-            'post_name' => 'event-details',
-            'post_status' => 'publish',
-            'post_type' => 'page',
-            'page_template' => 'event-details-template.php'
+            'post_title'   => 'Event Details',
+            'post_name'    => 'event-details',
+            'post_status'  => 'publish',
+            'post_type'    => 'page',
+            'post_content' => '[event_details]',
         ]);
         
-        if (is_wp_error($page_id)) {
-            error_log('Failed to create Event Details page: '.$page_id->get_error_message());
-        }
+        // Assign template - now using correct path
+        update_post_meta($page_id, '_wp_page_template', 'event-details-template.php');
     }
 }
 register_activation_hook(__FILE__, 'create_event_details_page');
-
-// Also check on admin pages
-add_action('admin_init', 'create_event_details_page');
 // Add menu and submenu pages into dashboard
 function custom_add_menu_page() {
     // Main menu for Event Management
@@ -147,7 +95,6 @@ function handle_delete_event() {
             'wp_event',
             'wp_event_accueil',
             'wp_event_budget',
-            'wp_event_elements',
             'wp_event_formats',
             'wp_event_gadgets',
             'wp_event_hebergement',
@@ -174,110 +121,6 @@ function handle_delete_event() {
 }
 add_action('admin_init', 'handle_delete_event');
 
-function verify_event_details_page() {
-    $page = get_page_by_path('event-details');
-    
-    if (!$page) {
-        $page_id = wp_insert_post([
-            'post_title' => 'Event Details',
-            'post_name' => 'event-details',
-            'post_status' => 'publish',
-            'post_type' => 'page',
-            'page_template' => 'event-details-template.php'
-        ]);
-        
-        if (is_wp_error($page_id)) {
-            error_log('Failed to create Event Details page: ' . $page_id->get_error_message());
-        }
-    } else {
-        // Ensure template is assigned
-        update_post_meta($page->ID, '_wp_page_template', 'event-details-template.php');
-    }
-}
-add_action('admin_init', 'verify_event_details_page');
-// Create Event Viewer page on plugin activation
-function create_event_viewer_page() {
-    // Check if the page already exists
-    $page = get_page_by_path('event-viewer');
-
-    if (!$page) {
-        // Create the page
-        $page_data = array(
-            'post_title'   => 'Event Viewer',
-            'post_content' => '[event_viewer]', // Add the shortcode
-            'post_status'  => 'publish',
-            'post_type'    => 'page',
-            'post_name'    => 'event-viewer', // Slug
-        );
-
-        // Insert the page
-        wp_insert_post($page_data);
-    }
-}
-register_activation_hook(__FILE__, 'create_event_viewer_page');
-
-// Event Viewer shortcode handler
-function event_details_shortcode($atts) {
-    // Get event ID from URL parameter
-    $event_id = isset($_GET['event_id']) ? intval($_GET['event_id']) : 0;
-    
-    if (!$event_id) {
-        return '<div class="notice notice-error"><p>No event ID specified.</p></div>';
-    }
-
-    global $wpdb;
-    $event_table = $wpdb->prefix . 'event';
-    $event = $wpdb->get_row($wpdb->prepare(
-        "SELECT * FROM $event_table WHERE event_id = %d", 
-        $event_id
-    ));
-
-    if (!$event) {
-        return '<div class="notice notice-error"><p>Event not found.</p></div>';
-    }
-
-    // Start building output
-    ob_start(); ?>
-    <div class="event-details-container">
-        <h1><?php echo esc_html($event->event_name); ?></h1>
-        
-        <div class="event-meta">
-            <p><strong>Company:</strong> <?php echo esc_html($event->company_name); ?></p>
-            <p><strong>Date:</strong> <?php echo esc_html($event->event_date); ?></p>
-            <p><strong>Location:</strong> <?php echo esc_html($event->event_location); ?></p>
-        </div>
-        
-        <div class="event-contacts">
-            <h2>Contact Information</h2>
-            <p><strong>Contact:</strong> <?php echo esc_html($event->contact_name); ?></p>
-            <p><strong>Email:</strong> <?php echo esc_html($event->contact_email); ?></p>
-            <p><strong>Phone:</strong> <?php echo esc_html($event->contact_phone); ?></p>
-        </div>
-        
-        <!-- Add more sections as needed -->
-    </div>
-    <?php
-    return ob_get_clean();
-}
-add_shortcode('event_details', 'event_details_shortcode');
-
-// ======================== MODIFIED VIEW BUTTON CODE ========================
-// This will replace your existing view button code in the event management table
-function get_event_view_button($event_id) {
-    // Get the event viewer page
-    $viewer_page = get_page_by_path('event-viewer');
-    
-    if ($viewer_page) {
-        $viewer_url = get_permalink($viewer_page->ID) . '?event_id=' . $event_id;
-        return '<a href="' . esc_url($viewer_url) . '" class="button button-primary" target="_blank">View</a>';
-    } else {
-        $button = '<button class="button button-secondary" disabled title="Event Viewer page not found">View</button>';
-        if (current_user_can('manage_options')) {
-            $button .= ' <span style="color:#ff0000;font-size:12px;">(Missing <a href="' . admin_url('post-new.php?post_type=page') . '" style="color:#ff0000;">Event Viewer Page</a>)</span>';
-        }
-        return $button;
-    }
-}
 // Callback for Event Management page
 function event_management_callback() {
     global $wpdb;
@@ -388,13 +231,24 @@ function event_management_callback() {
                                 <!-- Delete Button (unchanged) -->
                                 <a href="<?php echo esc_url(wp_nonce_url(add_query_arg(array('action' => 'delete', 'event_id' => $event->event_id)), 'delete_event_' . $event->event_id)); ?>" class="button button-primary" onclick="return confirm('Are you sure you want to delete this event?');">Delete</a>
                                 
-                                <!-- ========== VIEW BUTTON CODE ========== -->
-  <a href="<?php echo plugins_url('modification.php', __FILE__); ?>?event_id=<?php echo $event->event_id; ?>" 
-           class="button button-secondary" 
-           target="_blank">
-           View
-        </a>
-</td>
+                                
+  <!-- View Button -->
+  <!-- View Button -->
+  <?php
+    $details_page = get_page_by_path('event-details');
+    if ($details_page) {
+    $view_url = add_query_arg('event_id', $event->event_id, get_permalink($details_page->ID));
+    echo '<a href="' . esc_url($view_url) . '" class="button button-secondary" target="_blank">View</a>';
+} else {
+        echo '<button class="button button-secondary" disabled title="Please create an \'Event Details\' page">View</button>';
+        if (current_user_can('manage_options')) {
+            echo '<span style="color:#ff0000;margin-left:5px;font-size:12px;">';
+            echo '(Missing <a href="' . admin_url('post-new.php?post_type=page') . '" style="color:#ff0000;text-decoration:underline;">Event Details Page</a>)';
+            echo '</span>';
+        }
+    }
+    ?>
+                    </td>
                 </tr>
             <?php endforeach; ?>
         <?php else : ?>
@@ -406,6 +260,27 @@ function event_management_callback() {
 </table>
     </div>
     <?php
+}
+
+/**
+ * Override the theme's template with the plugin's template.
+ */
+add_filter('page_template', 'venuux_load_event_details_template');
+
+function venuux_load_event_details_template($template) {
+    global $post;
+
+    // Check if this is the 'event-details' page
+    if ($post && $post->post_name === 'event-details') {
+        $plugin_template = plugin_dir_path(__FILE__) . 'event-details-template.php';
+        
+        // Check if the file exists in the plugin
+        if (file_exists($plugin_template)) {
+            return $plugin_template;
+        }
+    }
+
+    return $template;
 }
 
 
@@ -430,7 +305,7 @@ function multistepform_shortcode() {
     $view_button_base_url = 'http://localhost/bako/41-2/';
 
     // Output the interface button and a dynamic "View" button
-    return 
+    return '
         <a href="' . esc_url($interface_url) . '" onclick="window.open(\'' . esc_url($interface_url) . '\', \'_blank\'); return false;" 
             style="display: inline-block; padding: 10px 20px; background-color: #1890A0; color: #fff; text-decoration: none; border-radius: 5px; margin-right: 10px;">
             Open Multistep Form
@@ -478,6 +353,21 @@ register_activation_hook(__FILE__, function() {
 
 
 
+// Add this with your other shortcode functions
+function event_details_shortcode($atts) {
+    if (!isset($_GET['event_id'])) {
+        return '<p>No event ID provided.</p>';
+    }
+    
+    // Let the template handle the display
+    ob_start();
+    get_template_part('indexx');
+    return ob_get_clean();
+}
+add_shortcode('event_details', 'event_details_shortcode');
+
+
+
 // Shortcode and database
 function view_event_form_shortcode($atts) {
     $atts = shortcode_atts(array(
@@ -511,7 +401,7 @@ function create_event_tables() {
     $event_gadgets_table = $wpdb->prefix . 'event_gadgets';
     $event_budget_table = $wpdb->prefix . 'event_budget';
     $event_suivi_table = $wpdb->prefix . 'event_suivi';
-    $event_element_supplementaires = $wpdb->prefix . 'event_elements';
+    $event_event_supplementaires = $wpdb->prefix . 'event_supplementaires';
     $event_suggestions_table = $wpdb->prefix . 'event_suggestions';
 
     // SQL queries
@@ -688,8 +578,8 @@ function create_event_tables() {
         FOREIGN KEY (event_id) REFERENCES $event_table(event_id) ON DELETE CASCADE
     ) $charset_collate;";
 
-    $sql14 = "CREATE TABLE IF NOT EXISTS $event_element_supplementaires (
-        element_id INT AUTO_INCREMENT PRIMARY KEY,
+    $sql14 = "CREATE TABLE IF NOT EXISTS $event_event_supplementaires (
+        supplementaires_id INT AUTO_INCREMENT PRIMARY KEY,
         event_id INT,
         exigences_specifiques TEXT,
         FOREIGN KEY (event_id) REFERENCES $event_table(event_id) ON DELETE CASCADE
